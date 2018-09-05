@@ -56,7 +56,14 @@ func homeDir() string {
 func NewKubernetesCompiler() (Compiler, error) {
 	var kubeconfig *string
 	if home := homeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+		path := filepath.Join(home, ".kube", "config")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+		} else if err == nil {
+			kubeconfig = flag.String("kubeconfig", path, "(optional) absolute path to the kubeconfig file")
+		} else {
+			return nil, err
+		}
 	} else {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
