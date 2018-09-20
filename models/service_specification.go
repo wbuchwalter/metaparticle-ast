@@ -6,6 +6,8 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"strconv"
+
 	strfmt "github.com/go-openapi/strfmt"
 
 	"github.com/go-openapi/errors"
@@ -18,7 +20,7 @@ import (
 type ServiceSpecification struct {
 
 	// containers
-	Containers ServiceSpecificationContainers `json:"containers"`
+	Containers []*Container `json:"containers"`
 
 	// depends
 	Depends string `json:"depends,omitempty"`
@@ -28,7 +30,7 @@ type ServiceSpecification struct {
 	Name *string `json:"name"`
 
 	// ports
-	Ports ServiceSpecificationPorts `json:"ports"`
+	Ports []*ServicePort `json:"ports"`
 
 	// reference
 	Reference string `json:"reference,omitempty"`
@@ -40,26 +42,61 @@ type ServiceSpecification struct {
 	ShardSpec *ShardSpecification `json:"shardSpec,omitempty"`
 
 	// volumes
-	Volumes ServiceSpecificationVolumes `json:"volumes"`
+	Volumes []*Volume `json:"volumes"`
 }
 
 // Validate validates this service specification
 func (m *ServiceSpecification) Validate(formats strfmt.Registry) error {
 	var res []error
 
+	if err := m.validateContainers(formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.validateName(formats); err != nil {
-		// prop
+		res = append(res, err)
+	}
+
+	if err := m.validatePorts(formats); err != nil {
 		res = append(res, err)
 	}
 
 	if err := m.validateShardSpec(formats); err != nil {
-		// prop
+		res = append(res, err)
+	}
+
+	if err := m.validateVolumes(formats); err != nil {
 		res = append(res, err)
 	}
 
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
+	return nil
+}
+
+func (m *ServiceSpecification) validateContainers(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.Containers) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.Containers); i++ {
+		if swag.IsZero(m.Containers[i]) { // not required
+			continue
+		}
+
+		if m.Containers[i] != nil {
+			if err := m.Containers[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("containers" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
+	}
+
 	return nil
 }
 
@@ -72,6 +109,31 @@ func (m *ServiceSpecification) validateName(formats strfmt.Registry) error {
 	return nil
 }
 
+func (m *ServiceSpecification) validatePorts(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.Ports) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.Ports); i++ {
+		if swag.IsZero(m.Ports[i]) { // not required
+			continue
+		}
+
+		if m.Ports[i] != nil {
+			if err := m.Ports[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("ports" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
+	}
+
+	return nil
+}
+
 func (m *ServiceSpecification) validateShardSpec(formats strfmt.Registry) error {
 
 	if swag.IsZero(m.ShardSpec) { // not required
@@ -79,13 +141,37 @@ func (m *ServiceSpecification) validateShardSpec(formats strfmt.Registry) error 
 	}
 
 	if m.ShardSpec != nil {
-
 		if err := m.ShardSpec.Validate(formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("shardSpec")
 			}
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (m *ServiceSpecification) validateVolumes(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.Volumes) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.Volumes); i++ {
+		if swag.IsZero(m.Volumes[i]) { // not required
+			continue
+		}
+
+		if m.Volumes[i] != nil {
+			if err := m.Volumes[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("volumes" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
 	}
 
 	return nil

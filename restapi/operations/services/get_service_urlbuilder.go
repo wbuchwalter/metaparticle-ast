@@ -48,6 +48,7 @@ func (o *GetServiceURL) Build() (*url.URL, error) {
 	} else {
 		return nil, errors.New("Name is required on GetServiceURL")
 	}
+
 	_basePath := o._basePath
 	result.Path = golangswaggerpaths.Join(_basePath, _path)
 

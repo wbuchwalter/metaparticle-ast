@@ -6,6 +6,8 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"strconv"
+
 	strfmt "github.com/go-openapi/strfmt"
 
 	"github.com/go-openapi/errors"
@@ -24,7 +26,7 @@ type Container struct {
 	CPU string `json:"cpu,omitempty"`
 
 	// env
-	Env ContainerEnv `json:"env"`
+	Env []*EnvVar `json:"env"`
 
 	// gpu
 	Gpu int32 `json:"gpu,omitempty"`
@@ -37,20 +39,22 @@ type Container struct {
 	Memory string `json:"memory,omitempty"`
 
 	// volume mounts
-	VolumeMounts ContainerVolumeMounts `json:"volumeMounts"`
+	VolumeMounts []*VolumeMount `json:"volumeMounts"`
 }
 
 // Validate validates this container
 func (m *Container) Validate(formats strfmt.Registry) error {
 	var res []error
 
-	if err := m.validateCommand(formats); err != nil {
-		// prop
+	if err := m.validateEnv(formats); err != nil {
 		res = append(res, err)
 	}
 
 	if err := m.validateImage(formats); err != nil {
-		// prop
+		res = append(res, err)
+	}
+
+	if err := m.validateVolumeMounts(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -60,10 +64,26 @@ func (m *Container) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *Container) validateCommand(formats strfmt.Registry) error {
+func (m *Container) validateEnv(formats strfmt.Registry) error {
 
-	if swag.IsZero(m.Command) { // not required
+	if swag.IsZero(m.Env) { // not required
 		return nil
+	}
+
+	for i := 0; i < len(m.Env); i++ {
+		if swag.IsZero(m.Env[i]) { // not required
+			continue
+		}
+
+		if m.Env[i] != nil {
+			if err := m.Env[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("env" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
 	}
 
 	return nil
@@ -73,6 +93,31 @@ func (m *Container) validateImage(formats strfmt.Registry) error {
 
 	if err := validate.Required("image", "body", m.Image); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (m *Container) validateVolumeMounts(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.VolumeMounts) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.VolumeMounts); i++ {
+		if swag.IsZero(m.VolumeMounts[i]) { // not required
+			continue
+		}
+
+		if m.VolumeMounts[i] != nil {
+			if err := m.VolumeMounts[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("volumeMounts" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
 	}
 
 	return nil

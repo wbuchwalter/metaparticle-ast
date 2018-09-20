@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-openapi/runtime"
 
-	"github.com/metaparticle-io/metaparticle-ast/models"
+	models "github.com/metaparticle-io/metaparticle-ast/models"
 )
 
 // DeleteServiceNoContentCode is the HTTP code returned for type DeleteServiceNoContent
@@ -25,6 +25,7 @@ type DeleteServiceNoContent struct {
 
 // NewDeleteServiceNoContent creates DeleteServiceNoContent with default headers values
 func NewDeleteServiceNoContent() *DeleteServiceNoContent {
+
 	return &DeleteServiceNoContent{}
 }
 

@@ -7,6 +7,7 @@ package models
 
 import (
 	"encoding/json"
+	"strconv"
 
 	strfmt "github.com/go-openapi/strfmt"
 
@@ -20,30 +21,63 @@ import (
 type TfReplicaSpec struct {
 
 	// containers
-	Containers TfReplicaSpecContainers `json:"containers"`
+	Containers []*Container `json:"containers"`
 
 	// replica type
+	// Enum: [MASTER WORKER PS]
 	ReplicaType string `json:"replicaType,omitempty"`
 
 	// replicas
 	Replicas int32 `json:"replicas,omitempty"`
 
 	// volumes
-	Volumes TfReplicaSpecVolumes `json:"volumes"`
+	Volumes []*Volume `json:"volumes"`
 }
 
 // Validate validates this tf replica spec
 func (m *TfReplicaSpec) Validate(formats strfmt.Registry) error {
 	var res []error
 
+	if err := m.validateContainers(formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.validateReplicaType(formats); err != nil {
-		// prop
+		res = append(res, err)
+	}
+
+	if err := m.validateVolumes(formats); err != nil {
 		res = append(res, err)
 	}
 
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
+	return nil
+}
+
+func (m *TfReplicaSpec) validateContainers(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.Containers) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.Containers); i++ {
+		if swag.IsZero(m.Containers[i]) { // not required
+			continue
+		}
+
+		if m.Containers[i] != nil {
+			if err := m.Containers[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("containers" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
+	}
+
 	return nil
 }
 
@@ -60,10 +94,13 @@ func init() {
 }
 
 const (
+
 	// TfReplicaSpecReplicaTypeMASTER captures enum value "MASTER"
 	TfReplicaSpecReplicaTypeMASTER string = "MASTER"
+
 	// TfReplicaSpecReplicaTypeWORKER captures enum value "WORKER"
 	TfReplicaSpecReplicaTypeWORKER string = "WORKER"
+
 	// TfReplicaSpecReplicaTypePS captures enum value "PS"
 	TfReplicaSpecReplicaTypePS string = "PS"
 )
@@ -85,6 +122,31 @@ func (m *TfReplicaSpec) validateReplicaType(formats strfmt.Registry) error {
 	// value enum
 	if err := m.validateReplicaTypeEnum("replicaType", "body", m.ReplicaType); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (m *TfReplicaSpec) validateVolumes(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.Volumes) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.Volumes); i++ {
+		if swag.IsZero(m.Volumes[i]) { // not required
+			continue
+		}
+
+		if m.Volumes[i] != nil {
+			if err := m.Volumes[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("volumes" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
 	}
 
 	return nil

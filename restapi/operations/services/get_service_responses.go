@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-openapi/runtime"
 
-	"github.com/metaparticle-io/metaparticle-ast/models"
+	models "github.com/metaparticle-io/metaparticle-ast/models"
 )
 
 // GetServiceOKCode is the HTTP code returned for type GetServiceOK
@@ -30,6 +30,7 @@ type GetServiceOK struct {
 
 // NewGetServiceOK creates GetServiceOK with default headers values
 func NewGetServiceOK() *GetServiceOK {
+
 	return &GetServiceOK{}
 }
 

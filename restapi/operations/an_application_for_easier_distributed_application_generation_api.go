@@ -29,6 +29,8 @@ func NewAnApplicationForEasierDistributedApplicationGenerationAPI(spec *loads.Do
 		formats:             strfmt.Default,
 		defaultConsumes:     "application/json",
 		defaultProduces:     "application/json",
+		customConsumers:     make(map[string]runtime.Consumer),
+		customProducers:     make(map[string]runtime.Producer),
 		ServerShutdown:      func() {},
 		spec:                spec,
 		ServeError:          errors.ServeError,
@@ -58,6 +60,8 @@ type AnApplicationForEasierDistributedApplicationGenerationAPI struct {
 	context         *middleware.Context
 	handlers        map[string]map[string]http.Handler
 	formats         strfmt.Registry
+	customConsumers map[string]runtime.Consumer
+	customProducers map[string]runtime.Producer
 	defaultConsumes string
 	defaultProduces string
 	Middleware      func(middleware.Builder) http.Handler
@@ -202,6 +206,10 @@ func (o *AnApplicationForEasierDistributedApplicationGenerationAPI) ConsumersFor
 			result["application/json"] = o.JSONConsumer
 
 		}
+
+		if c, ok := o.customConsumers[mt]; ok {
+			result[mt] = c
+		}
 	}
 	return result
 
@@ -217,6 +225,10 @@ func (o *AnApplicationForEasierDistributedApplicationGenerationAPI) ProducersFor
 		case "application/json":
 			result["application/json"] = o.JSONProducer
 
+		}
+
+		if p, ok := o.customProducers[mt]; ok {
+			result[mt] = p
 		}
 	}
 	return result
@@ -288,9 +300,19 @@ func (o *AnApplicationForEasierDistributedApplicationGenerationAPI) Serve(builde
 	return o.context.APIHandler(builder)
 }
 
-// Init allows you to just initialize the handler cache, you can then recompose the middelware as you see fit
+// Init allows you to just initialize the handler cache, you can then recompose the middleware as you see fit
 func (o *AnApplicationForEasierDistributedApplicationGenerationAPI) Init() {
 	if len(o.handlers) == 0 {
 		o.initHandlerCache()
 	}
+}
+
+// RegisterConsumer allows you to add (or override) a consumer for a media type.
+func (o *AnApplicationForEasierDistributedApplicationGenerationAPI) RegisterConsumer(mediaType string, consumer runtime.Consumer) {
+	o.customConsumers[mediaType] = consumer
+}
+
+// RegisterProducer allows you to add (or override) a producer for a media type.
+func (o *AnApplicationForEasierDistributedApplicationGenerationAPI) RegisterProducer(mediaType string, producer runtime.Producer) {
+	o.customProducers[mediaType] = producer
 }

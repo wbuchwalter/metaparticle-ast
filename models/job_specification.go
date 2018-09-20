@@ -6,6 +6,8 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"strconv"
+
 	strfmt "github.com/go-openapi/strfmt"
 
 	"github.com/go-openapi/errors"
@@ -21,7 +23,7 @@ type JobSpecification struct {
 	Completion int32 `json:"completion,omitempty"`
 
 	// containers
-	Containers JobSpecificationContainers `json:"containers"`
+	Containers []*Container `json:"containers"`
 
 	// name
 	// Required: true
@@ -34,15 +36,22 @@ type JobSpecification struct {
 	Schedule string `json:"schedule,omitempty"`
 
 	// volumes
-	Volumes JobSpecificationVolumes `json:"volumes"`
+	Volumes []*Volume `json:"volumes"`
 }
 
 // Validate validates this job specification
 func (m *JobSpecification) Validate(formats strfmt.Registry) error {
 	var res []error
 
+	if err := m.validateContainers(formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.validateName(formats); err != nil {
-		// prop
+		res = append(res, err)
+	}
+
+	if err := m.validateVolumes(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -52,10 +61,60 @@ func (m *JobSpecification) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
+func (m *JobSpecification) validateContainers(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.Containers) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.Containers); i++ {
+		if swag.IsZero(m.Containers[i]) { // not required
+			continue
+		}
+
+		if m.Containers[i] != nil {
+			if err := m.Containers[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("containers" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
+	}
+
+	return nil
+}
+
 func (m *JobSpecification) validateName(formats strfmt.Registry) error {
 
 	if err := validate.Required("name", "body", m.Name); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (m *JobSpecification) validateVolumes(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.Volumes) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.Volumes); i++ {
+		if swag.IsZero(m.Volumes[i]) { // not required
+			continue
+		}
+
+		if m.Volumes[i] != nil {
+			if err := m.Volumes[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("volumes" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
 	}
 
 	return nil

@@ -6,6 +6,8 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"strconv"
+
 	strfmt "github.com/go-openapi/strfmt"
 
 	"github.com/go-openapi/errors"
@@ -22,7 +24,7 @@ type TfJobSpecification struct {
 	Name *string `json:"name"`
 
 	// replica specs
-	ReplicaSpecs TfJobSpecificationReplicaSpecs `json:"replicaSpecs"`
+	ReplicaSpecs []*TfReplicaSpec `json:"replicaSpecs"`
 }
 
 // Validate validates this tf job specification
@@ -30,7 +32,10 @@ func (m *TfJobSpecification) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateName(formats); err != nil {
-		// prop
+		res = append(res, err)
+	}
+
+	if err := m.validateReplicaSpecs(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -44,6 +49,31 @@ func (m *TfJobSpecification) validateName(formats strfmt.Registry) error {
 
 	if err := validate.Required("name", "body", m.Name); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (m *TfJobSpecification) validateReplicaSpecs(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.ReplicaSpecs) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.ReplicaSpecs); i++ {
+		if swag.IsZero(m.ReplicaSpecs[i]) { // not required
+			continue
+		}
+
+		if m.ReplicaSpecs[i] != nil {
+			if err := m.ReplicaSpecs[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("replicaSpecs" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
 	}
 
 	return nil

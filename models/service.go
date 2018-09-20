@@ -6,6 +6,8 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"strconv"
+
 	strfmt "github.com/go-openapi/strfmt"
 
 	"github.com/go-openapi/errors"
@@ -22,21 +24,25 @@ type Service struct {
 	GUID *int64 `json:"guid"`
 
 	// jobs
-	Jobs ServiceJobs `json:"jobs"`
+	Jobs []*JobSpecification `json:"jobs"`
 
 	// name
 	// Required: true
 	// Min Length: 1
 	Name *string `json:"name"`
 
+	// namespace
+	// Min Length: 1
+	Namespace string `json:"namespace,omitempty"`
+
 	// serve
 	Serve *ServeSpecification `json:"serve,omitempty"`
 
 	// services
-	Services ServiceServices `json:"services"`
+	Services []*ServiceSpecification `json:"services"`
 
 	// tf jobs
-	TfJobs ServiceTfJobs `json:"tfJobs"`
+	TfJobs []*TfJobSpecification `json:"tfJobs"`
 }
 
 // Validate validates this service
@@ -44,17 +50,30 @@ func (m *Service) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateGUID(formats); err != nil {
-		// prop
+		res = append(res, err)
+	}
+
+	if err := m.validateJobs(formats); err != nil {
 		res = append(res, err)
 	}
 
 	if err := m.validateName(formats); err != nil {
-		// prop
+		res = append(res, err)
+	}
+
+	if err := m.validateNamespace(formats); err != nil {
 		res = append(res, err)
 	}
 
 	if err := m.validateServe(formats); err != nil {
-		// prop
+		res = append(res, err)
+	}
+
+	if err := m.validateServices(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateTfJobs(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -73,6 +92,31 @@ func (m *Service) validateGUID(formats strfmt.Registry) error {
 	return nil
 }
 
+func (m *Service) validateJobs(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.Jobs) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.Jobs); i++ {
+		if swag.IsZero(m.Jobs[i]) { // not required
+			continue
+		}
+
+		if m.Jobs[i] != nil {
+			if err := m.Jobs[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("jobs" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
+	}
+
+	return nil
+}
+
 func (m *Service) validateName(formats strfmt.Registry) error {
 
 	if err := validate.Required("name", "body", m.Name); err != nil {
@@ -86,6 +130,19 @@ func (m *Service) validateName(formats strfmt.Registry) error {
 	return nil
 }
 
+func (m *Service) validateNamespace(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.Namespace) { // not required
+		return nil
+	}
+
+	if err := validate.MinLength("namespace", "body", string(m.Namespace), 1); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (m *Service) validateServe(formats strfmt.Registry) error {
 
 	if swag.IsZero(m.Serve) { // not required
@@ -93,13 +150,62 @@ func (m *Service) validateServe(formats strfmt.Registry) error {
 	}
 
 	if m.Serve != nil {
-
 		if err := m.Serve.Validate(formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("serve")
 			}
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (m *Service) validateServices(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.Services) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.Services); i++ {
+		if swag.IsZero(m.Services[i]) { // not required
+			continue
+		}
+
+		if m.Services[i] != nil {
+			if err := m.Services[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("services" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
+	}
+
+	return nil
+}
+
+func (m *Service) validateTfJobs(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.TfJobs) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.TfJobs); i++ {
+		if swag.IsZero(m.TfJobs[i]) { // not required
+			continue
+		}
+
+		if m.TfJobs[i] != nil {
+			if err := m.TfJobs[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("tfJobs" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
 	}
 
 	return nil

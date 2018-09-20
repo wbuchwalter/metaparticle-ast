@@ -56,7 +56,14 @@ func homeDir() string {
 func NewKubernetesCompiler() (Compiler, error) {
 	var kubeconfig *string
 	if home := homeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+		path := filepath.Join(home, ".kube", "config")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+		} else if err == nil {
+			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+		} else {
+			return nil, err
+		}
 	} else {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
@@ -110,38 +117,38 @@ func envvars(container *models.Container) []v1.EnvVar {
 	return envvars
 }
 
-func (k *kubernetesPlan) deleteService(service *models.ServiceSpecification, client *kubernetes.Clientset) error {
+func (k *kubernetesPlan) deleteService(service *models.ServiceSpecification, namespace string, client *kubernetes.Clientset) error {
 	if service.ShardSpec != nil {
-		return k.deleteShardedService(service, client)
+		return k.deleteShardedService(service, namespace, client)
 	}
-	return k.deleteReplicatedService(service, client)
+	return k.deleteReplicatedService(service, namespace, client)
 }
 
-func (k *kubernetesPlan) deleteJob(job *models.JobSpecification, client *kubernetes.Clientset) error {
-	return client.BatchV1().Jobs("default").Delete(*job.Name, &meta.DeleteOptions{})
+func (k *kubernetesPlan) deleteJob(job *models.JobSpecification, namespace string, client *kubernetes.Clientset) error {
+	return client.BatchV1().Jobs(namespace).Delete(*job.Name, &meta.DeleteOptions{})
 }
 
-func (k *kubernetesPlan) deleteTfJob(job *models.TfJobSpecification, client *versioned.Clientset) error {
-	return client.KubeflowV1alpha2().TFJobs("default").Delete(*job.Name, &meta.DeleteOptions{})
+func (k *kubernetesPlan) deleteTfJob(job *models.TfJobSpecification, namespace string, client *versioned.Clientset) error {
+	return client.KubeflowV1alpha2().TFJobs(namespace).Delete(*job.Name, &meta.DeleteOptions{})
 }
 
-func (k *kubernetesPlan) deleteReplicatedService(service *models.ServiceSpecification, client *kubernetes.Clientset) error {
+func (k *kubernetesPlan) deleteReplicatedService(service *models.ServiceSpecification, namespace string, client *kubernetes.Clientset) error {
 	name := *service.Name
 	if k.dryrun {
 		glog.Infof("Would have deleted deployment and service %s\n", name)
 		return nil
 	}
-	if err := client.ExtensionsV1beta1().Deployments("default").Delete(name, deleteOptions); err != nil {
+	if err := client.ExtensionsV1beta1().Deployments(namespace).Delete(name, deleteOptions); err != nil {
 		return err
 	}
 	if len(service.Ports) == 0 {
 		// no service created, so just return
 		return nil
 	}
-	return client.CoreV1().Services("default").Delete(name, nil)
+	return client.CoreV1().Services(namespace).Delete(name, nil)
 }
 
-func (k *kubernetesPlan) deleteShardedService(service *models.ServiceSpecification, client *kubernetes.Clientset) error {
+func (k *kubernetesPlan) deleteShardedService(service *models.ServiceSpecification, namespace string, client *kubernetes.Clientset) error {
 	name := *service.Name
 	shardName := makeSharderName(name)
 
@@ -150,16 +157,16 @@ func (k *kubernetesPlan) deleteShardedService(service *models.ServiceSpecificati
 		return nil
 	}
 
-	if err := client.ExtensionsV1beta1().Deployments("default").Delete(shardName, deleteOptions); err != nil {
+	if err := client.ExtensionsV1beta1().Deployments(namespace).Delete(shardName, deleteOptions); err != nil {
 		return err
 	}
-	if err := client.AppsV1beta1().StatefulSets("default").Delete(name, deleteOptions); err != nil {
+	if err := client.AppsV1beta1().StatefulSets(namespace).Delete(name, deleteOptions); err != nil {
 		return err
 	}
-	if err := client.CoreV1().Services("default").Delete(shardName, deleteOptions); err != nil {
+	if err := client.CoreV1().Services(namespace).Delete(shardName, deleteOptions); err != nil {
 		return err
 	}
-	return client.CoreV1().Services("default").Delete(name, deleteOptions)
+	return client.CoreV1().Services(namespace).Delete(name, deleteOptions)
 }
 
 func containers(service *models.ServiceSpecification) []v1.Container {
@@ -217,7 +224,7 @@ func volumes(volumes []*models.Volume) []v1.Volume {
 	return vs
 }
 
-func (k *kubernetesPlan) deploy(service *models.ServiceSpecification, client *kubernetes.Clientset) {
+func (k *kubernetesPlan) deploy(service *models.ServiceSpecification, namespace string, client *kubernetes.Clientset) {
 	name := *service.Name
 
 	deployment := &v1beta1.Deployment{
@@ -250,12 +257,12 @@ func (k *kubernetesPlan) deploy(service *models.ServiceSpecification, client *ku
 		return
 	}
 
-	if _, err := client.ExtensionsV1beta1().Deployments("default").Create(deployment); err != nil {
+	if _, err := client.ExtensionsV1beta1().Deployments(namespace).Create(deployment); err != nil {
 		log.Fatalf(err.Error())
 	}
 }
 
-func (k *kubernetesPlan) deployStateful(service *models.ServiceSpecification, client *kubernetes.Clientset) {
+func (k *kubernetesPlan) deployStateful(service *models.ServiceSpecification, namespace string, client *kubernetes.Clientset) {
 	name := *service.Name
 
 	deployment := &apps_v1beta1.StatefulSet{
@@ -285,7 +292,7 @@ func (k *kubernetesPlan) deployStateful(service *models.ServiceSpecification, cl
 
 	k.output(deployment, name+"-stateful-set")
 	if !k.dryrun {
-		if _, err := client.AppsV1beta1().StatefulSets("default").Create(deployment); err != nil {
+		if _, err := client.AppsV1beta1().StatefulSets(namespace).Create(deployment); err != nil {
 			log.Fatalf(err.Error())
 		}
 	}
@@ -335,7 +342,7 @@ func (k *kubernetesPlan) deployStateful(service *models.ServiceSpecification, cl
 		return
 	}
 
-	if _, err := client.ExtensionsV1beta1().Deployments("default").Create(shardDeployment); err != nil {
+	if _, err := client.ExtensionsV1beta1().Deployments(namespace).Create(shardDeployment); err != nil {
 		log.Fatalf(err.Error())
 	}
 }
@@ -352,7 +359,7 @@ func getPorts(service *models.ServiceSpecification) []v1.ServicePort {
 	return ports
 }
 
-func (k *kubernetesPlan) createLoadBalancedService(service *models.ServiceSpecification, public bool, client *kubernetes.Clientset) {
+func (k *kubernetesPlan) createLoadBalancedService(service *models.ServiceSpecification, public bool, namespace string, client *kubernetes.Clientset) {
 	name := *service.Name
 
 	svc := &v1.Service{
@@ -376,7 +383,7 @@ func (k *kubernetesPlan) createLoadBalancedService(service *models.ServiceSpecif
 		return
 	}
 
-	if _, err := client.CoreV1().Services("default").Create(svc); err != nil {
+	if _, err := client.CoreV1().Services(namespace).Create(svc); err != nil {
 		log.Fatalf(err.Error())
 	}
 }
@@ -392,7 +399,7 @@ func getShardAddresses(service *models.ServiceSpecification) string {
 	return strings.Join(pieces, ",")
 }
 
-func (k *kubernetesPlan) createStatefulService(service *models.ServiceSpecification, public bool, client *kubernetes.Clientset) {
+func (k *kubernetesPlan) createStatefulService(service *models.ServiceSpecification, public bool, namespace string, client *kubernetes.Clientset) {
 	name := *service.Name
 
 	statefulSvc := &v1.Service{
@@ -413,7 +420,7 @@ func (k *kubernetesPlan) createStatefulService(service *models.ServiceSpecificat
 
 	k.output(statefulSvc, name+"-shards-service")
 	if !k.dryrun {
-		if _, err := client.CoreV1().Services("default").Create(statefulSvc); err != nil {
+		if _, err := client.CoreV1().Services(namespace).Create(statefulSvc); err != nil {
 			log.Fatalf(err.Error())
 		}
 	}
@@ -438,7 +445,7 @@ func (k *kubernetesPlan) createStatefulService(service *models.ServiceSpecificat
 		return
 	}
 
-	if _, err := client.CoreV1().Services("default").Create(svc); err != nil {
+	if _, err := client.CoreV1().Services(namespace).Create(svc); err != nil {
 		log.Fatalf(err.Error())
 	}
 }
@@ -447,7 +454,7 @@ func (k *kubernetesCompiler) Compile(opts *CompilerOptions, obj *models.Service)
 	return &kubernetesPlan{service: obj, clientset: k.clientset, tfJobClientSet: k.tfJobClientSet, opts: opts}, nil
 }
 
-func (k *kubernetesPlan) createJob(obj *models.JobSpecification) error {
+func (k *kubernetesPlan) createJob(obj *models.JobSpecification, namespace string) error {
 	name := *obj.Name
 	job := &batch.Job{
 		ObjectMeta: meta.ObjectMeta{
@@ -470,7 +477,7 @@ func (k *kubernetesPlan) createJob(obj *models.JobSpecification) error {
 			},
 		},
 	}
-	_, err := k.clientset.BatchV1().Jobs("default").Create(job)
+	_, err := k.clientset.BatchV1().Jobs(namespace).Create(job)
 	return err
 }
 
@@ -488,7 +495,7 @@ func getTFReplicaType(replicaType string) kf.TFReplicaType {
 	panic(fmt.Sprintf("Unknown replica type: %s", replicaType))
 }
 
-func (k *kubernetesPlan) createTfJob(obj *models.TfJobSpecification) error {
+func (k *kubernetesPlan) createTfJob(obj *models.TfJobSpecification, namespace string) error {
 	name := *obj.Name
 
 	specMap := make(map[kf.TFReplicaType]*kf.TFReplicaSpec)
@@ -520,7 +527,7 @@ func (k *kubernetesPlan) createTfJob(obj *models.TfJobSpecification) error {
 		},
 	}
 
-	_, err := k.tfJobClientSet.KubeflowV1alpha2().TFJobs("default").Create(job)
+	_, err := k.tfJobClientSet.KubeflowV1alpha2().TFJobs(namespace).Create(job)
 	return err
 }
 
@@ -539,49 +546,50 @@ func (k *kubernetesPlan) Dump(dir string) error {
 
 func (k *kubernetesPlan) Execute(dryrun bool) error {
 	k.dryrun = dryrun
+	service := k.service
 	if k.delete {
-		for ix := range k.service.Services {
-			if err := k.deleteService(k.service.Services[ix], k.clientset); err != nil {
+		for ix := range service.Services {
+			if err := k.deleteService(service.Services[ix], service.Namespace, k.clientset); err != nil {
 				return err
 			}
 		}
-		for ix := range k.service.Jobs {
-			if err := k.deleteJob(k.service.Jobs[ix], k.clientset); err != nil {
+		for ix := range service.Jobs {
+			if err := k.deleteJob(service.Jobs[ix], service.Namespace, k.clientset); err != nil {
 				return err
 			}
 		}
-		for ix := range k.service.TfJobs {
-			if err := k.deleteTfJob(k.service.TfJobs[ix], k.tfJobClientSet); err != nil {
+		for ix := range service.TfJobs {
+			if err := k.deleteTfJob(service.TfJobs[ix], service.Namespace, k.tfJobClientSet); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
-	service := k.service
+
 	for ix := range service.Services {
 		if service.Services[ix].Replicas > 0 && service.Services[ix].ShardSpec != nil {
 			return fmt.Errorf("%v: Replicas and shards are mutually exclusive", service.Services[ix].Name)
 		}
 		public := *service.Serve.Name == *service.Services[ix].Name && service.Serve.Public
 		if service.Services[ix].Replicas > 0 {
-			k.deploy(service.Services[ix], k.clientset)
+			k.deploy(service.Services[ix], service.Namespace, k.clientset)
 			public := *service.Serve.Name == *service.Services[ix].Name && service.Serve.Public
 			if len(service.Services[ix].Ports) > 0 {
-				k.createLoadBalancedService(service.Services[ix], public, k.clientset)
+				k.createLoadBalancedService(service.Services[ix], public, service.Namespace, k.clientset)
 			}
 		}
 		if service.Services[ix].ShardSpec != nil && service.Services[ix].ShardSpec.Shards > 0 {
-			k.deployStateful(service.Services[ix], k.clientset)
-			k.createStatefulService(service.Services[ix], public, k.clientset)
+			k.deployStateful(service.Services[ix], service.Namespace, k.clientset)
+			k.createStatefulService(service.Services[ix], public, service.Namespace, k.clientset)
 		}
 	}
 	for ix := range service.Jobs {
-		if err := k.createJob(service.Jobs[ix]); err != nil {
+		if err := k.createJob(service.Jobs[ix], service.Namespace); err != nil {
 			return err
 		}
 	}
 	for ix := range service.TfJobs {
-		if err := k.createTfJob(service.TfJobs[ix]); err != nil {
+		if err := k.createTfJob(service.TfJobs[ix], service.Namespace); err != nil {
 			return err
 		}
 	}
